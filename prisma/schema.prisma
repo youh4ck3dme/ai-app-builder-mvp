@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id        String        @id @default(uuid())
+  prompt    String
+  status    ProjectStatus
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  runId     String?
+  error     String?
+
+  plan   PlannedFile[]
+  files  GeneratedFile[]
+  events ProjectEvent[]
+}
+
+model PlannedFile {
+  id          String   @id @default(uuid())
+  projectId   String
+  path        String
+  description String
+  createdAt   DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, path])
+}
+
+model GeneratedFile {
+  id          String   @id @default(uuid())
+  projectId   String
+  path        String
+  code        String
+  description String?
+  updatedAt   DateTime
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, path])
+}
+
+model ProjectEvent {
+  id        String    @id @default(uuid())
+  projectId String
+  kind      EventKind
+  message   String
+  createdAt DateTime  @default(now())
+  meta      Json?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
+}
+
+enum ProjectStatus {
+  queued
+  planning
+  generating_code @map("generating-code")
+  completed
+  failed
+}
+
+enum EventKind {
+  run
+  status
+  plan
+  file
+  error
+}

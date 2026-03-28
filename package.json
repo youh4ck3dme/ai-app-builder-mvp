@@ -8,9 +8,12 @@
     "start": "next start",
     "lint": "tsc --noEmit",
     "workflow:web": "workflow web",
-    "workflow:runs": "workflow inspect runs"
+    "workflow:runs": "workflow inspect runs",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push"
   },
   "dependencies": {
+    "@prisma/client": "^6.16.0",
     "ai": "latest",
     "next": "latest",
     "react": "latest",
@@ -22,6 +25,7 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "prisma": "^6.16.0",
     "typescript": "latest"
   }
 }
