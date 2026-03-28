@@ -1,0 +1,127 @@
+
+> ai-app-builder-mvp@0.1.0 build
+> next build
+
+Discovering workflow directives 1654ms
+Created steps bundle 98ms
+▲ [WARNING] "import.meta" is not available with the "cjs" output format and will be empty [empty-import-meta]
+
+    lib/generated/prisma/client.ts:10:53:
+      10 │ ...lThis['__dirname'] = path.dirname(fileURLToPath(import.meta.url));
+         ╵                                                    ~~~~~~~~~~~
+
+  You need to set the output format to "esm" for "import.meta" to work correctly.
+
+X [ERROR] No matching export in "lib/mock-db.ts" for import "appendProjectEvent"
+
+    lib/mock-services.ts:2:9:
+      2 │ import { appendProjectEvent, createProject as createProjectRecord, ...
+        ╵          ~~~~~~~~~~~~~~~~~~
+
+X [ERROR] No matching export in "lib/mock-db.ts" for import "saveGeneratedFile"
+
+    lib/mock-services.ts:2:142:
+      2 │ ...ersistArchitecturePlan, saveGeneratedFile, setProjectError as pe...
+        ╵                            ~~~~~~~~~~~~~~~~~
+
+X [ERROR] You are attempting to use "node:path" which is a Node.js module. Node.js modules are not available in workflow functions.
+
+Learn more: https://useworkflow.dev/err/node-js-module-in-workflow [plugin workflow-node-module-error]
+
+    lib\generated\prisma\client.ts:16:26:
+      16 │ globalThis['__dirname'] = path.dirname(fileURLToPath(import.meta.u...
+         │                           ~~~~
+         ╵                           Move this function into a step function.
+
+X [ERROR] You are attempting to use "node:url" which is a Node.js module. Node.js modules are not available in workflow functions.
+
+Learn more: https://useworkflow.dev/err/node-js-module-in-workflow [plugin workflow-node-module-error]
+
+    lib\generated\prisma\client.ts:16:39:
+      16 │ ...alThis['__dirname'] = path.dirname(fileURLToPath(import.meta.url))
+         │                                       ~~~~~~~~~~~~~
+         ╵                                       Move this function into a step function.
+
+X [ERROR] You are attempting to use "@prisma/client" which depends on Node.js modules. Packages that depend on Node.js modules are not available in workflow functions.
+
+Learn more: https://useworkflow.dev/err/node-js-module-in-workflow [plugin workflow-node-module-error]
+
+    lib\generated\prisma\internal\class.ts:18:14:
+      18 │ const config: runtime.GetPrismaClientConfig = {
+         │               ~~~~~~~
+         ╵               Move this function into a step function.
+
+
+> Build error occurred
+Error: Build failed with 5 errors:
+lib/mock-services.ts:2:9: ERROR: No matching export in "lib/mock-db.ts" for import "appendProjectEvent"
+lib/mock-services.ts:2:142: ERROR: No matching export in "lib/mock-db.ts" for import "saveGeneratedFile"
+lib\generated\prisma\client.ts:16:26: ERROR: [plugin: workflow-node-module-error] You are attempting to use "node:path" which is a Node.js module. Node.js modules are not available in workflow functions.
+
+Learn more: https://useworkflow.dev/err/node-js-module-in-workflow
+lib\generated\prisma\client.ts:16:39: ERROR: [plugin: workflow-node-module-error] You are attempting to use "node:url" which is a Node.js module. Node.js modules are not available in workflow functions.
+
+Learn more: https://useworkflow.dev/err/node-js-module-in-workflow
+lib\generated\prisma\internal\class.ts:18:14: ERROR: [plugin: workflow-node-module-error] You are attempting to use "@prisma/client" which depends on Node.js modules. Packages that depend on Node.js modules are not available in workflow functions.
+
+Learn more: https://useworkflow.dev/err/node-js-module-in-workflow
+    at ignore-listed frames {
+  errors: [
+    {
+      detail: undefined,
+      id: '',
+      location: [Object],
+      notes: [],
+      pluginName: '',
+      text: 'No matching export in "lib/mock-db.ts" for import "appendProjectEvent"'
+    },
+    {
+      detail: undefined,
+      id: '',
+      location: [Object],
+      notes: [],
+      pluginName: '',
+      text: 'No matching export in "lib/mock-db.ts" for import "saveGeneratedFile"'
+    },
+    {
+      id: '',
+      pluginName: 'workflow-node-module-error',
+      text: 'You are attempting to use "node:path" which is a Node.js module. Node.js modules are not available in workflow functions.\n' +
+        '\n' +
+        'Learn more: https://useworkflow.dev/err/node-js-module-in-workflow',
+      location: [Object],
+      notes: [],
+      detail: -1
+    },
+    {
+      id: '',
+      pluginName: 'workflow-node-module-error',
+      text: 'You are attempting to use "node:url" which is a Node.js module. Node.js modules are not available in workflow functions.\n' +
+        '\n' +
+        'Learn more: https://useworkflow.dev/err/node-js-module-in-workflow',
+      location: [Object],
+      notes: [],
+      detail: -1
+    },
+    {
+      id: '',
+      pluginName: 'workflow-node-module-error',
+      text: 'You are attempting to use "@prisma/client" which depends on Node.js modules. Packages that depend on Node.js modules are not available in workflow functions.\n' +
+        '\n' +
+        'Learn more: https://useworkflow.dev/err/node-js-module-in-workflow',
+      location: [Object],
+      notes: [],
+      detail: -1
+    }
+  ],
+  warnings: [
+    {
+      detail: undefined,
+      id: 'empty-import-meta',
+      location: [Object],
+      notes: [Array],
+      pluginName: '',
+      text: '"import.meta" is not available with the "cjs" output format and will be empty'
+    }
+  ]
+}

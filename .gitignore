@@ -31,3 +31,5 @@ Thumbs.db
 
 # Zip
 *.zip
+
+/lib/generated/prisma

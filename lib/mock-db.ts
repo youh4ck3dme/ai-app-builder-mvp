@@ -1,3 +1,4 @@
+import { PrismaClient } from '@prisma/client';
 import type {
   GeneratedFile,
   PlannedFile,
@@ -6,192 +7,194 @@ import type {
   ProjectStatus,
 } from '@/types/project';
 
-type Store = {
-  projects: Map<string, ProjectRecord>;
-};
+// Prisma singleton
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+export const prisma = globalForPrisma.prisma || new PrismaClient();
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
-declare global {
-  // eslint-disable-next-line no-var
-  var __AI_APP_BUILDER_STORE__: Store | undefined;
-}
-
-function createStore(): Store {
+/**
+ * Helpers to convert between Prisma and domain models
+ */
+function mapProject(dbProject: any): ProjectRecord {
   return {
-    projects: new Map<string, ProjectRecord>(),
+    ...dbProject,
+    createdAt: dbProject.createdAt.toISOString(),
+    updatedAt: dbProject.updatedAt.toISOString(),
+    plan: JSON.parse(dbProject.plan),
+    files: JSON.parse(dbProject.files),
+    events: dbProject.events?.map(mapEvent) || [],
   };
 }
 
-function getStore(): Store {
-  if (!globalThis.__AI_APP_BUILDER_STORE__) {
-    globalThis.__AI_APP_BUILDER_STORE__ = createStore();
-  }
-
-  return globalThis.__AI_APP_BUILDER_STORE__;
-}
-
-function now(): string {
-  return new Date().toISOString();
-}
-
-function clone<T>(value: T): T {
-  return typeof structuredClone === 'function'
-    ? structuredClone(value)
-    : JSON.parse(JSON.stringify(value)) as T;
-}
-
-function sortFiles(files: GeneratedFile[]): GeneratedFile[] {
-  return [...files].sort((a, b) => a.path.localeCompare(b.path));
+function mapEvent(dbEvent: any): ProjectEvent {
+  return {
+    id: dbEvent.id,
+    kind: dbEvent.kind as any,
+    message: dbEvent.message,
+    metadata: dbEvent.metadata ? JSON.parse(dbEvent.metadata) : undefined,
+    createdAt: dbEvent.createdAt.toISOString(),
+  };
 }
 
 export async function createProject(prompt: string): Promise<ProjectRecord> {
-  const timestamp = now();
-  const project: ProjectRecord = {
-    id: crypto.randomUUID(),
-    prompt,
-    status: 'queued',
-    createdAt: timestamp,
-    updatedAt: timestamp,
-    runId: undefined,
-    error: null,
-    plan: [],
-    files: [],
-    events: [
-      {
-        id: crypto.randomUUID(),
-        kind: 'status',
-        message: 'Project created and queued.',
-        createdAt: timestamp,
+  const project = await prisma.project.create({
+    data: {
+      prompt,
+      status: 'queued',
+      plan: '[]',
+      files: '[]',
+      events: {
+        create: {
+          kind: 'status',
+          message: 'Project created and queued.',
+        },
       },
-    ],
-  };
+    },
+    include: {
+      events: true,
+    },
+  });
 
-  getStore().projects.set(project.id, project);
-  return clone(project);
+  return mapProject(project);
 }
 
 export async function listProjects(): Promise<ProjectRecord[]> {
-  return [...getStore().projects.values()]
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .map(clone);
+  const projects = await prisma.project.findMany({
+    orderBy: { createdAt: 'desc' },
+    include: {
+      events: {
+        orderBy: { createdAt: 'desc' },
+      },
+    },
+  });
+
+  return projects.map(mapProject);
 }
 
 export async function getProject(projectId: string): Promise<ProjectRecord | null> {
-  const project = getStore().projects.get(projectId);
-  return project ? clone(project) : null;
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: {
+      events: {
+        orderBy: { createdAt: 'desc' },
+      },
+    },
+  });
+
+  if (!project) return null;
+  return mapProject(project);
 }
 
 export async function updateProject(
   projectId: string,
   patch: Partial<Omit<ProjectRecord, 'id' | 'createdAt' | 'events' | 'files' | 'plan'>>,
 ): Promise<ProjectRecord | null> {
-  const store = getStore();
-  const current = store.projects.get(projectId);
+  const project = await prisma.project.update({
+    where: { id: projectId },
+    data: patch as any,
+    include: {
+      events: {
+        orderBy: { createdAt: 'desc' },
+      },
+    },
+  });
 
-  if (!current) {
-    return null;
-  }
-
-  const next: ProjectRecord = {
-    ...current,
-    ...patch,
-    updatedAt: now(),
-  };
-
-  store.projects.set(projectId, next);
-  return clone(next);
+  return mapProject(project);
 }
 
-export async function updateProjectStatus(
-  projectId: string,
-  status: ProjectStatus,
-): Promise<ProjectRecord | null> {
-  return updateProject(projectId, { status });
+export async function deleteProject(projectId: string): Promise<void> {
+  await prisma.project.delete({
+    where: { id: projectId },
+  });
 }
 
-export async function setProjectError(
+export async function appendProjectEvent(
   projectId: string,
-  error: string | null,
-): Promise<ProjectRecord | null> {
-  return updateProject(projectId, { error });
+  kind: ProjectEvent['kind'],
+  message: string,
+  metadata?: any,
+): Promise<ProjectEvent> {
+  const event = await prisma.event.create({
+    data: {
+      projectId,
+      kind,
+      message,
+      metadata: metadata ? JSON.stringify(metadata) : null,
+    },
+  });
+
+  return mapEvent(event);
 }
 
 export async function saveArchitecturePlan(
   projectId: string,
   plan: PlannedFile[],
-): Promise<ProjectRecord | null> {
-  const store = getStore();
-  const current = store.projects.get(projectId);
-
-  if (!current) {
-    return null;
-  }
-
-  const next: ProjectRecord = {
-    ...current,
-    plan: [...plan],
-    updatedAt: now(),
-  };
-
-  store.projects.set(projectId, next);
-  return clone(next);
+): Promise<void> {
+  await prisma.project.update({
+    where: { id: projectId },
+    data: {
+      plan: JSON.stringify(plan),
+    },
+  });
 }
 
 export async function saveGeneratedFile(
   projectId: string,
-  file: GeneratedFile,
-): Promise<ProjectRecord | null> {
-  const store = getStore();
-  const current = store.projects.get(projectId);
+  path: string,
+  content: string,
+  description?: string,
+): Promise<void> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { files: true },
+  });
 
-  if (!current) {
-    return null;
-  }
+  if (!project) return;
 
-  const existing = current.files.findIndex((entry) => entry.path === file.path);
-  const nextFiles = [...current.files];
+  const currentFiles: GeneratedFile[] = JSON.parse(project.files);
+  const existingIndex = currentFiles.findIndex((f) => f.path === path);
 
-  if (existing >= 0) {
-    nextFiles[existing] = file;
-  } else {
-    nextFiles.push(file);
-  }
-
-  const next: ProjectRecord = {
-    ...current,
-    files: sortFiles(nextFiles),
-    updatedAt: now(),
+  const newFile: GeneratedFile = {
+    path,
+    content,
+    description,
+    updatedAt: new Date().toISOString(),
   };
 
-  store.projects.set(projectId, next);
-  return clone(next);
+  if (existingIndex >= 0) {
+    currentFiles[existingIndex] = newFile;
+  } else {
+    currentFiles.push(newFile);
+  }
+
+  // Sort files for consistent UI
+  currentFiles.sort((a, b) => a.path.localeCompare(b.path));
+
+  await prisma.project.update({
+    where: { id: projectId },
+    data: {
+      files: JSON.stringify(currentFiles),
+    },
+  });
 }
 
-export async function appendProjectEvent(
-  projectId: string,
-  event: Omit<ProjectEvent, 'id' | 'createdAt'> &
-    Partial<Pick<ProjectEvent, 'id' | 'createdAt'>>,
-): Promise<ProjectRecord | null> {
-  const store = getStore();
-  const current = store.projects.get(projectId);
+export async function attachRunId(projectId: string, runId: string): Promise<void> {
+  await prisma.project.update({
+    where: { id: projectId },
+    data: { runId },
+  });
+}
 
-  if (!current) {
-    return null;
-  }
+export async function setProjectError(projectId: string, error: string | null): Promise<void> {
+  await prisma.project.update({
+    where: { id: projectId },
+    data: { error },
+  });
+}
 
-  const nextEvent: ProjectEvent = {
-    id: event.id ?? crypto.randomUUID(),
-    createdAt: event.createdAt ?? now(),
-    kind: event.kind,
-    message: event.message,
-    meta: event.meta,
-  };
-
-  const next: ProjectRecord = {
-    ...current,
-    events: [...current.events, nextEvent],
-    updatedAt: now(),
-  };
-
-  store.projects.set(projectId, next);
-  return clone(next);
+export async function updateProjectStatus(projectId: string, status: ProjectStatus): Promise<void> {
+  await prisma.project.update({
+    where: { id: projectId },
+    data: { status },
+  });
 }

@@ -3,14 +3,7 @@
 // Global step function provided by the workflow environment
 declare const step: any;
 
-import {
-  appendEvent,
-  callLLM,
-  saveArchitecturePlan,
-  saveFile,
-  setProjectError,
-  updateProjectStatus,
-} from '@/lib/mock-services';
+
 import type { PlannedFile } from '@/types/project';
 
 export type AppGeneratorWorkflowInput = {
@@ -145,6 +138,7 @@ export async function appGeneratorWorkflow(
 
   try {
     await step('status-planning-started', async (): Promise<void> => {
+      const { setProjectError, updateProjectStatus, appendEvent } = await import('@/lib/mock-services');
       await setProjectError(projectId, null);
       await updateProjectStatus(projectId, 'planning');
       await appendEvent(projectId, 'status', 'Planning workflow started.');
@@ -154,6 +148,7 @@ export async function appGeneratorWorkflow(
       'generate-architecture',
       { retry: { count: 3, delay: '10s' } },
       async (): Promise<PlannedFile[]> => {
+        const { callLLM, saveArchitecturePlan, appendEvent } = await import('@/lib/mock-services');
         const response = await callLLM(buildArchitecturePrompt(userPrompt));
         const plan = parseArchitecturePlan(response);
 
@@ -165,6 +160,7 @@ export async function appGeneratorWorkflow(
     );
 
     await step('status-planning-done', async (): Promise<void> => {
+      const { updateProjectStatus, appendEvent } = await import('@/lib/mock-services');
       await updateProjectStatus(projectId, 'generating-code');
       await appendEvent(projectId, 'status', 'Planning finished. Code generation started.');
     });
@@ -174,6 +170,7 @@ export async function appGeneratorWorkflow(
         buildFileStepName(index, file.path),
         { retry: { count: 3, delay: '10s' } },
         async (): Promise<void> => {
+          const { appendEvent, callLLM, saveFile } = await import('@/lib/mock-services');
           await appendEvent(projectId, 'file', `Generating ${file.path}...`, {
             path: file.path,
           });
@@ -186,6 +183,7 @@ export async function appGeneratorWorkflow(
     }
 
     await step('status-completed', async (): Promise<void> => {
+      const { updateProjectStatus, appendEvent } = await import('@/lib/mock-services');
       await updateProjectStatus(projectId, 'completed');
       await appendEvent(projectId, 'status', 'Workflow completed successfully.');
     });
@@ -199,6 +197,7 @@ export async function appGeneratorWorkflow(
       error instanceof Error ? error.message : 'Unknown workflow error while generating the app.';
 
     await step('status-failed', async (): Promise<void> => {
+      const { setProjectError, updateProjectStatus, appendEvent } = await import('@/lib/mock-services');
       await setProjectError(projectId, message);
       await updateProjectStatus(projectId, 'failed');
       await appendEvent(projectId, 'error', 'Workflow failed after retries were exhausted.', {
