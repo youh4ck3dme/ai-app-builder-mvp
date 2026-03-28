@@ -66,3 +66,9 @@ types/
 - push generated files into Vercel Sandbox or a preview workspace
 - add build/test/fix loops
 - add template packs and guardrails
+
+## Important Note on Prisma & Vercel Workflow
+
+Due to the way the Next.js workflow bundler handles Node.js dependencies, there are a few important project constraints:
+1. **Prisma Client Generation**: The `schema.prisma` explicitly outputs the client to `../node_modules/@prisma/client` to allow the workflow bundler to externalize it properly.
+2. **Dynamic Imports in Workflows**: Any services wrapping Prisma (e.g. `mock-services.ts`) must be imported dynamically inside `step()` executions (e.g. `await import('@/lib/mock-services')`), rather than via top-level static imports in the workflow file. This ensures the workflow bundler doesn't attempt to include Node.js modules like `fs` or `path` in the edge bundle.
