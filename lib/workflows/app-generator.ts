@@ -1,6 +1,7 @@
 'use workflow';
 
-import { step } from 'workflow';
+// Global step function provided by the workflow environment
+declare const step: any;
 
 import {
   appendEvent,
@@ -191,7 +192,7 @@ export async function appGeneratorWorkflow(
 
     return {
       projectId,
-      generatedFiles: architecture.map((file) => file.path),
+      generatedFiles: architecture.map((file: PlannedFile) => file.path),
     };
   } catch (error) {
     const message =

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { start } from 'workflow/api';
+import { start } from '@workflow/core/runtime';
 
 import { attachRunId, fetchProject, setProjectError } from '@/lib/mock-services';
 import { appGeneratorWorkflow } from '@/lib/workflows/app-generator';
