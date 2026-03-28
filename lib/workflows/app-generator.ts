@@ -1,7 +1,5 @@
 'use workflow';
 
-import { step } from 'workflow';
-
 import {
   appendEvent,
   callLLM,
@@ -120,19 +118,70 @@ function parseArchitecturePlan(raw: string): PlannedFile[] {
   return files;
 }
 
-function sanitizeStepSegment(value: string): string {
-  const normalized = value
-    .replace(/[^a-zA-Z0-9/_-]+/g, '-')
-    .replace(/[\\/]+/g, '_')
-    .replace(/-+/g, '-')
-    .replace(/_+/g, '_')
-    .replace(/^[-_]+|[-_]+$/g, '');
+async function markPlanningStartedStep(projectId: string): Promise<void> {
+  'use step';
 
-  return normalized.length > 0 ? normalized.slice(0, 100) : 'file';
+  await setProjectError(projectId, null);
+  await updateProjectStatus(projectId, 'planning');
+  await appendEvent(projectId, 'status', 'Planning workflow started.');
 }
 
-function buildFileStepName(index: number, path: string): string {
-  return `generate-file-${index + 1}-${sanitizeStepSegment(path)}`;
+async function generateArchitectureStep(
+  projectId: string,
+  userPrompt: string,
+): Promise<PlannedFile[]> {
+  'use step';
+
+  const response = await callLLM(buildArchitecturePrompt(userPrompt));
+  const plan = parseArchitecturePlan(response);
+
+  await saveArchitecturePlan(projectId, plan);
+  await appendEvent(projectId, 'plan', 'Architecture plan saved.');
+
+  return plan;
+}
+generateArchitectureStep.maxRetries = 3;
+
+async function markPlanningDoneStep(projectId: string): Promise<void> {
+  'use step';
+
+  await updateProjectStatus(projectId, 'generating-code');
+  await appendEvent(projectId, 'status', 'Planning finished. Code generation started.');
+}
+
+async function generateFileStep(
+  projectId: string,
+  userPrompt: string,
+  file: PlannedFile,
+  architecture: readonly PlannedFile[],
+): Promise<void> {
+  'use step';
+
+  await appendEvent(projectId, 'file', `Generating ${file.path}...`, {
+    path: file.path,
+  });
+
+  const code = await callLLM(buildFilePrompt(userPrompt, file, architecture));
+
+  await saveFile(projectId, file.path, stripCodeFences(code), file.description);
+}
+generateFileStep.maxRetries = 3;
+
+async function markCompletedStep(projectId: string): Promise<void> {
+  'use step';
+
+  await updateProjectStatus(projectId, 'completed');
+  await appendEvent(projectId, 'status', 'Workflow completed successfully.');
+}
+
+async function markFailedStep(projectId: string, message: string): Promise<void> {
+  'use step';
+
+  await setProjectError(projectId, message);
+  await updateProjectStatus(projectId, 'failed');
+  await appendEvent(projectId, 'error', 'Workflow failed after retries were exhausted.', {
+    error: message,
+  });
 }
 
 export async function appGeneratorWorkflow(
@@ -143,51 +192,15 @@ export async function appGeneratorWorkflow(
   const { projectId, userPrompt } = input;
 
   try {
-    await step('status-planning-started', async (): Promise<void> => {
-      await setProjectError(projectId, null);
-      await updateProjectStatus(projectId, 'planning');
-      await appendEvent(projectId, 'status', 'Planning workflow started.');
-    });
+    await markPlanningStartedStep(projectId);
+    const architecture = await generateArchitectureStep(projectId, userPrompt);
+    await markPlanningDoneStep(projectId);
 
-    const architecture = await step(
-      'generate-architecture',
-      { retry: { count: 3, delay: '10s' } },
-      async (): Promise<PlannedFile[]> => {
-        const response = await callLLM(buildArchitecturePrompt(userPrompt));
-        const plan = parseArchitecturePlan(response);
-
-        await saveArchitecturePlan(projectId, plan);
-        await appendEvent(projectId, 'plan', 'Architecture plan saved.');
-
-        return plan;
-      },
-    );
-
-    await step('status-planning-done', async (): Promise<void> => {
-      await updateProjectStatus(projectId, 'generating-code');
-      await appendEvent(projectId, 'status', 'Planning finished. Code generation started.');
-    });
-
-    for (const [index, file] of architecture.entries()) {
-      await step(
-        buildFileStepName(index, file.path),
-        { retry: { count: 3, delay: '10s' } },
-        async (): Promise<void> => {
-          await appendEvent(projectId, 'file', `Generating ${file.path}...`, {
-            path: file.path,
-          });
-
-          const code = await callLLM(buildFilePrompt(userPrompt, file, architecture));
-
-          await saveFile(projectId, file.path, stripCodeFences(code), file.description);
-        },
-      );
+    for (const file of architecture) {
+      await generateFileStep(projectId, userPrompt, file, architecture);
     }
 
-    await step('status-completed', async (): Promise<void> => {
-      await updateProjectStatus(projectId, 'completed');
-      await appendEvent(projectId, 'status', 'Workflow completed successfully.');
-    });
+    await markCompletedStep(projectId);
 
     return {
       projectId,
@@ -197,13 +210,7 @@ export async function appGeneratorWorkflow(
     const message =
       error instanceof Error ? error.message : 'Unknown workflow error while generating the app.';
 
-    await step('status-failed', async (): Promise<void> => {
-      await setProjectError(projectId, message);
-      await updateProjectStatus(projectId, 'failed');
-      await appendEvent(projectId, 'error', 'Workflow failed after retries were exhausted.', {
-        error: message,
-      });
-    });
+    await markFailedStep(projectId, message);
 
     throw error;
   }

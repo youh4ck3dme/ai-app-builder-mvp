@@ -8,7 +8,7 @@ A small Next.js App Router skeleton for building your own **Lovable/v0-style AI 
 - starts a durable workflow for generation
 - plans a file architecture
 - generates files one-by-one
-- stores plan, files, status, and timeline in a mock in-memory store
+- stores plan, files, status, and timeline in a persistent SQLite database through Prisma
 - shows live-ish progress in the dashboard via polling
 
 ## Stack
@@ -16,13 +16,15 @@ A small Next.js App Router skeleton for building your own **Lovable/v0-style AI 
 - Next.js App Router
 - Vercel Workflow DevKit
 - Vercel AI SDK
+- Prisma + SQLite
 - Zod
-- Mock persistence layer
 
 ## Quick start
 
 ```bash
 npm install
+DATABASE_URL='file:./dev.db' npm run prisma:generate
+DATABASE_URL='file:./dev.db' npm run prisma:push
 npm run dev
 ```
 
@@ -43,9 +45,12 @@ app/
   projects/[id]/page.tsx
 components/
 lib/
-  mock-db.ts
   mock-services.ts
+  prisma.ts
+  project-repository.ts
   workflows/app-generator.ts
+prisma/
+  schema.prisma
 types/
 ```
 
@@ -56,12 +61,12 @@ types/
 3. Workflow generates an architecture plan.
 4. Status flips to `generating-code`.
 5. Each file is generated in its own durable step.
-6. Generated files are saved into the mock store.
+6. Generated files are saved into the database.
 7. Status flips to `completed`.
 
 ## What to swap next for a real builder
 
-- replace `mock-db.ts` with Postgres / Neon / Supabase
+- move from SQLite to Postgres / Neon / Supabase
 - replace polling with workflow stream output or SSE
 - push generated files into Vercel Sandbox or a preview workspace
 - add build/test/fix loops
