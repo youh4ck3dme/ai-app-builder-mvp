@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+dist/
+
+# Vercel
+.vercel/
+
+# Vercel Workflow DevKit runtime data
+workflow-data/
+
+# Environment files (keep only .env.example)
+.env
+.env.local
+.env.*.local
+
+# Build & test artefacts
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Zip
+*.zip
